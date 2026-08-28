@@ -1,0 +1,2 @@
+"use client";import{usePathname}from"next/navigation";import{AppSidebar}from"./app-sidebar";
+export function AppFrame({children}:{children:React.ReactNode}){const pathname=usePathname(),auth=["/login","/signup","/setup"].includes(pathname);if(auth)return <main className="grid min-h-screen place-items-center px-4 py-10">{children}</main>;return <div className="min-h-screen md:grid md:grid-cols-[232px_1fr]"><AppSidebar/><main className="min-w-0 px-4 pb-24 pt-6 sm:px-6 md:px-8 md:pb-8 md:pt-8">{children}</main></div>}

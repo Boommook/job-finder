@@ -1,0 +1,1 @@
+export default function Loading(){return <div className="animate-pulse space-y-4"><div className="h-8 w-56 rounded bg-slate-200"/><div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{Array.from({length:5},(_,i)=><div key={i} className="panel h-20"/>)}</div><div className="panel h-24"/>{Array.from({length:4},(_,i)=><div key={i} className="panel h-56"/>)}</div>}
