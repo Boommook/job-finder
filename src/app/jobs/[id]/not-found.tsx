@@ -1,0 +1,2 @@
+import Link from"next/link";import{CircleHelp}from"lucide-react";
+export default function NotFound(){return <div className="mx-auto mt-20 max-w-md text-center"><CircleHelp className="mx-auto text-slate-400" size={42}/><h1 className="mt-4 text-2xl font-bold">Job not found</h1><p className="mt-2 text-sm leading-6 text-slate-500">This mock job ID does not exist or is no longer available in the current dataset.</p><Link href="/jobs" className="btn btn-primary mt-6">Return to jobs</Link></div>}
