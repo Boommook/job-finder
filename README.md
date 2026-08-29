@@ -62,3 +62,35 @@ npm run build
 The seed uses example.com URLs and deterministic match analyses so the existing dashboard can be tested without external systems. Salary values preserve Phase 1's hourly-style mock amounts; future ingestion can normalize compensation more deeply. Email confirmation behavior follows the Supabase project's Auth setting.
 
 Intentionally deferred to later phases: Lever/Greenhouse/Ashby adapters, scraping and external APIs, deduplication execution, eligibility/ranking engines, AI analysis, scheduled scans, notifications, feedback-driven scoring, and tailored CV generation. The normalized `jobs` table, `source`/`external_id` uniqueness, `content_hash`, `raw_payload`, and repository boundary provide natural seams for that work without implementing it early.
+
+## Phase 3: public ATS ingestion
+
+Phase 3 adds server-only ingestion for the documented public Greenhouse Job Board API, Lever Postings API, and Ashby Public Job Posting API. `src/lib/ingestion/adapters` isolates provider response parsing; normalized records then flow through one persistence runner. Provider endpoints are generated from a validated provider and board identifier, never from a client-supplied URL. HTML descriptions are converted to plain text and the original provider JSON remains in `raw_payload`.
+
+Run `supabase/migrations/20260828010000_phase_3_ingestion.sql` after the unchanged Phase 2 migration (and before or after the idempotent development seed). It adds compensation intervals, active/last-seen lifecycle fields, `job_sources`, and concise `ingestion_runs` metadata. A successful complete source scan upserts by source configuration plus external ID, preserves the internal job UUID and all separate user statuses, and closes jobs missing from that board. A failed fetch records the error and never closes jobs. `content_hash` supplies a deterministic conservative comparison identity; cross-provider title-only merging is intentionally not performed.
+
+The migration seeds 12 verified-format public boards: Linear, Notion, Ramp, Cursor, and Retool (Ashby); Cloudflare, Datadog, Anduril, and Highspot (Greenhouse); Palantir, Canva, and Zoox (Lever). Boards change over time; disable or remove a configuration if its company changes ATS.
+
+Add these server-only settings to `.env.local`:
+
+```dotenv
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+INGESTION_ADMIN_USER_IDS=your-auth-user-uuid
+```
+
+Obtain the service-role key from the Supabase Dashboard under Project Settings / API. It bypasses RLS, must never use a `NEXT_PUBLIC_` prefix, and must never be committed. Find your UUID in Authentication / Users. Existing browser authentication continues to use only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+
+Run all enabled boards with `npm run ingest`, or one source with `npm run ingest -- <job_sources UUID>`. The same runner powers authenticated `/sources` controls, which additionally require the signed-in UUID in `INGESTION_ADMIN_USER_IDS`. Authenticated users have read-only RLS access to source/run status; no browser role can mutate ingestion tables or jobs.
+
+Verify ingestion in Supabase with:
+
+```sql
+select company, title, source, source_id, external_id, is_active, last_seen_at
+from public.jobs where source_id is not null order by discovered_at desc limit 25;
+```
+
+Mock rows have `external_id like 'mock-%'`, `source_id is null`, and example.com URLs. They remain available until explicitly removed; delete only those rows when ready. Real compensation is stored with its provider-supplied currency and `hourly`, `yearly`, `monthly`, `weekly`, or `unknown` interval—unknown values are not guessed.
+
+`evaluateEligibility` is deterministic and conservative: it excludes rejected/closed jobs and only applies employment, keyword, known workplace, known yearly minimum-compensation, and explicit sponsorship conflicts. Unknown facts remain eligible. Preferred skills remain search preferences, not a representation of the candidate's background.
+
+Phase 3 does not use AI, analyze a résumé, generate résumés, rank with embeddings, apply automatically, scrape arbitrary sites, or schedule recurring scans. Existing seeded match analysis is fixture data, not a real personalized recommendation. Rich candidate skills, work history, education, projects, résumé content, and AI evaluation are deferred to Phase 4.

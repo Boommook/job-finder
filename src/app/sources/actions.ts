@@ -1,0 +1,3 @@
+"use server";import{revalidatePath}from"next/cache";import{requireUser}from"@/lib/auth";import{ingestEnabledSources}from"@/lib/ingestion/run";
+function isAdmin(id:string){return(process.env.INGESTION_ADMIN_USER_IDS??"").split(",").map(v=>v.trim()).includes(id)}
+export async function triggerIngestion(formData:FormData){const user=await requireUser();if(!isAdmin(user.id))return{ok:false,message:"This account is not configured as an ingestion administrator."};const sourceId=String(formData.get("sourceId")??"")||undefined;const results=await ingestEnabledSources(sourceId);revalidatePath("/sources");const failures=results.filter(r=>!r.ok).length;return{ok:failures===0,message:`Scanned ${results.length} source(s); ${failures} failed.`}}
