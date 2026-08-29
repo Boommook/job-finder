@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { CandidateResumeExtraction } from "@/lib/ai/schemas";
+import { normalizeResumeDate } from "@/lib/candidate/resume-date";
 
 function normalized(value:unknown):unknown {
   if (typeof value === "string") return value.trim().replace(/\s+/g," ").toLowerCase();
@@ -15,8 +16,8 @@ export function importFingerprint(kind:"experience"|"project"|"education",value:
 export function resumeImportPayload(extraction:CandidateResumeExtraction) {
   return {
     ...extraction,
-    experiences:extraction.experiences.map(item=>({...item,fingerprint:importFingerprint("experience",item)})),
-    projects:extraction.projects.map(item=>({...item,fingerprint:importFingerprint("project",item)})),
-    education:extraction.education.map(item=>({...item,fingerprint:importFingerprint("education",item)})),
+    experiences:extraction.experiences.map(item=>{const value={...item,startDate:normalizeResumeDate(item.startDate),endDate:normalizeResumeDate(item.endDate)};return{...value,fingerprint:importFingerprint("experience",value)}}),
+    projects:extraction.projects.map(item=>{const value={...item,startDate:normalizeResumeDate(item.startDate),endDate:normalizeResumeDate(item.endDate)};return{...value,fingerprint:importFingerprint("project",value)}}),
+    education:extraction.education.map(item=>{const value={...item,graduationDate:normalizeResumeDate(item.graduationDate)};return{...value,fingerprint:importFingerprint("education",value)}}),
   };
 }
