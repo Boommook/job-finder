@@ -1,0 +1,5 @@
+import { createHash } from "node:crypto";
+function canonical(value:unknown):unknown{if(Array.isArray(value))return value.map(canonical).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));if(value&&typeof value==="object")return Object.fromEntries(Object.entries(value).filter(([key])=>!["id","createdAt","updatedAt"].includes(key)).sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,canonical(item)]));if(typeof value==="string")return value.trim().replace(/\s+/g," ");return value}
+export function stableHash(value:unknown){return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex")}
+export const candidateProfileHash=stableHash;
+export function isEvaluationCacheValid(evaluation:{candidateProfileHash:string;jobContentHash:string;promptVersion:string},current:{candidateProfileHash:string;jobContentHash:string;promptVersion:string}){return evaluation.candidateProfileHash===current.candidateProfileHash&&evaluation.jobContentHash===current.jobContentHash&&evaluation.promptVersion===current.promptVersion}

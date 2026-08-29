@@ -80,7 +80,7 @@ INGESTION_ADMIN_USER_IDS=your-auth-user-uuid
 
 Obtain the service-role key from the Supabase Dashboard under Project Settings / API. It bypasses RLS, must never use a `NEXT_PUBLIC_` prefix, and must never be committed. Find your UUID in Authentication / Users. Existing browser authentication continues to use only `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
-Run all enabled boards with `npm run ingest`, or one source with `npm run ingest -- <job_sources UUID>`. The same runner powers authenticated `/sources` controls, which additionally require the signed-in UUID in `INGESTION_ADMIN_USER_IDS`. Authenticated users have read-only RLS access to source/run status; no browser role can mutate ingestion tables or jobs.
+Run all enabled boards with `npm run ingest`, or one source with `npm run ingest -- <job_sources UUID>`. The CLI explicitly loads `.env.local` from the project root, matching Next.js environment-file behavior; run it from that root directory. The same framework-neutral runner powers the CLI and authenticated `/sources` controls. The Next.js entrypoint remains guarded by `server-only`, and `/sources` additionally requires the signed-in UUID in `INGESTION_ADMIN_USER_IDS`. Authenticated users have read-only RLS access to source/run status; no browser role can mutate ingestion tables or jobs.
 
 Verify ingestion in Supabase with:
 
@@ -94,3 +94,21 @@ Mock rows have `external_id like 'mock-%'`, `source_id is null`, and example.com
 `evaluateEligibility` is deterministic and conservative, and the `/jobs` discovery feed now applies it using the authenticated user's `job_preferences`. It excludes rejected/closed jobs and only applies employment, keyword, known workplace, known yearly minimum-compensation, and explicit sponsorship conflicts. Unknown facts remain eligible, and soft preferences such as desired titles and preferred skills are not hard exclusions. Saved and applied jobs remain accessible even if they later become inactive or ineligible; rejected jobs remain hidden.
 
 Phase 3 does not use AI, analyze a résumé, generate résumés, rank with embeddings, apply automatically, scrape arbitrary sites, or schedule recurring scans. Existing seeded match analysis is fixture data, not a real personalized recommendation. Rich candidate skills, work history, education, projects, résumé content, and AI evaluation are deferred to Phase 4.
+
+## Phase 4: candidate intelligence and personalized evaluation
+
+Run `supabase/migrations/20260829010000_phase_4_candidate_ai.sql` after the three Phase 2/3 migrations listed above. It creates normalized candidate profile, skill, experience, project, education, private résumé metadata, and cached job-evaluation tables. It also creates the private `resumes` Storage bucket, a 10 MB PDF restriction, user-folder Storage policies, per-table RLS policies, and a job-content hashing trigger. No previous migration is modified.
+
+Add `OPENAI_API_KEY` and optionally `OPENAI_MODEL` to `.env.local`. The documented model default is `gpt-5-mini`. Neither variable uses `NEXT_PUBLIC_`. OpenAI calls are isolated in `src/lib/ai/provider.ts`, use the Responses API with strict Zod-backed Structured Outputs, have bounded retries/timeouts, and never run in browser code. Résumé and job text sent to the configured AI provider is used only for the user-requested parse or evaluation; authentication metadata, Supabase IDs, and unrelated settings are not sent.
+
+Open `/profile` to upload a selectable-text PDF. The server validates type/size, generates a user-scoped path, uploads to the private bucket, extracts text without OCR, and requests a structured résumé extraction. Image-only or malformed files fail recoverably; OCR is intentionally not automatic. Imported skills, experience, projects, and education are marked by source and remain unconfirmed until reviewed. Each item has an editable card and can be confirmed, corrected, added, or deleted. Parsing never silently replaces the existing Phase 2 identity profile.
+
+On a real job detail page, `Evaluate this job` first runs deterministic hard eligibility. Closed, rejected, explicit sponsorship-incompatible, employment/workplace-incompatible, excluded-keyword, and known below-minimum jobs do not call AI. AI performs only soft fit/ranking: skill, project, coursework, experience, interest, location, compensation, and learnable-gap analysis. It cannot override a hard exclusion. Real jobs without an evaluation display **Not evaluated**, never a fake 0% score; Phase 2 fixture scores remain explicitly separate.
+
+Evaluations persist with a normalized candidate/profile/preferences/résumé hash, job-content hash, and `phase4-v1` prompt version. A matching cache entry is reused without another API request. Candidate changes, résumé revisions, relevant job-content changes, or prompt-version changes mark prior output stale and expose `Re-evaluate`. Provider usage metadata is stored when returned. Candidate context and descriptions are compacted, and the visible-jobs batch is bounded to 25 sequential evaluations. It skips valid cache hits and hard-ineligible jobs; there is no automatic all-jobs batch.
+
+The jobs feed requests at most 50 rows at a time with an exact database count and stable secondary ordering. Search, status, source, company, and workplace filters are passed to PostgREST before pagination, so search covers the full table rather than the current screen. Feed descriptions are removed before data crosses the server/client boundary; detail pages fetch the full description separately. Saved and Applications remain durable per-user views. Global cross-page match ordering is deferred to Phase 5.
+
+Validate with `npm test`, `npm run lint`, `npm run typecheck`, and `npm run build`.
+
+Phase 4 intentionally defers tailored résumé generation, automated applications, recurring scheduled scans, OCR, arbitrary scraping, embeddings, and global/background evaluation of every job.
