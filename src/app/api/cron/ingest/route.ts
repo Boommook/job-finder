@@ -1,0 +1,3 @@
+import{NextResponse}from"next/server";import{isCronAuthorized}from"@/lib/cron-auth";import{ingestEnabledSources}from"@/lib/ingestion/run";
+export async function POST(request:Request){if(!isCronAuthorized(request))return NextResponse.json({error:"Unauthorized"},{status:401});try{const results=await ingestEnabledSources(),inserted=results.reduce((n,x)=>n+(x.ok?x.inserted:0),0),failures=results.filter(x=>!x.ok).length;return NextResponse.json({sources:results.length,newlyDiscovered:inserted,failures,results})}catch{return NextResponse.json({error:"Ingestion could not be started."},{status:500})}}
+export const GET=POST;

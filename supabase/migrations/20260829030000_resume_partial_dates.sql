@@ -8,7 +8,7 @@ alter table public.candidate_projects
 alter table public.candidate_education
   add column graduation_year smallint, add column graduation_month smallint, add column graduation_day smallint, add column graduation_raw text;
 
-alter table public.candidate_experiences add constraint candidate_experiences_partial_dates_check check
+alter table public.candidate_experiences add constraint candidayte_experiences_partial_dates_check check
   ((start_year is null and start_month is null and start_day is null or start_year between 1900 and 2200 and (start_month is null or start_month between 1 and 12) and (start_day is null or start_day between 1 and 31) and (start_day is null or start_month is not null)) and
    (end_year is null and end_month is null and end_day is null or end_year between 1900 and 2200 and (end_month is null or end_month between 1 and 12) and (end_day is null or end_day between 1 and 31) and (end_day is null or end_month is not null)));
 alter table public.candidate_projects add constraint candidate_projects_partial_dates_check check

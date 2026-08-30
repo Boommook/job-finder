@@ -1,0 +1,2 @@
+import{NextResponse}from"next/server";import{requireUser}from"@/lib/auth";import{isIngestionAdmin}from"@/lib/ingestion/admin";import{runRecommendationsForUser}from"@/lib/recommendations/run";
+export async function POST(){try{const user=await requireUser();if(!isIngestionAdmin(user.id))return NextResponse.json({error:"Forbidden"},{status:403});return NextResponse.json(await runRecommendationsForUser(user.id))}catch{return NextResponse.json({error:"Recommendation run failed."},{status:500})}}

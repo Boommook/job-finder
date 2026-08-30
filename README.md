@@ -1,5 +1,29 @@
 # Job Finder
 
+## Phase 5: personalized recommendation agent
+
+Run `supabase/migrations/20260830000000_phase_5_recommendations.sql` after Phase 4. It adds private `user_job_discovery` inbox state and `recommendation_runs` diagnostics. Discovery is separate from saved/rejected/applied status: `first_seen_at` is durable, while `viewed_at` is set only when a detail page is opened.
+
+The pipeline is: real ATS job -> hard eligibility -> deterministic prefilter -> bounded selection -> Phase 4 AI evaluation -> persistent hash/version cache -> personalized ranking. The prefilter uses explicit title, skill, level, workplace, location, industry, compensation, and freshness signals without an LLM or embeddings. Valid `apply`/`consider` evaluations at or above `RECOMMENDED_SCORE_THRESHOLD` populate Recommended; unevaluated jobs remain visible without a fabricated AI score.
+
+Cost controls live in `src/lib/recommendations/config.ts`. Runs default to 10 evaluations with an absolute cap of 25, scan at most 200 candidates, exclude closed/hard-ineligible/older-than-90-day jobs, apply a prefilter threshold, truncate descriptions, and check the Phase 4 cache first. Individual failures do not abort a batch. Model and token usage remain stored on `job_evaluations`.
+
+```dotenv
+CRON_SECRET=a-long-random-server-only-value
+AUTO_EVALUATION_LIMIT=10
+RECOMMENDED_SCORE_THRESHOLD=70
+AI_PREFILTER_THRESHOLD=55
+AI_MAX_JOB_DESCRIPTION_LENGTH=12000
+RECOMMENDATION_MAX_USERS_PER_RUN=10
+RECOMMENDATION_CANDIDATE_SCAN_LIMIT=200
+```
+
+Schedule ingestion with `GET` or `POST /api/cron/ingest` and `Authorization: Bearer $CRON_SECRET`. It calls the existing scheduler-neutral ingestion runner. `POST /api/recommendations/run` is a bounded per-user admin entry point: invoke while signed in as an ID in `INGESTION_ADMIN_USER_IDS`; it processes only that user. Future all-user scheduling should page opted-in user IDs with a durable cursor and fixed runtime budget while reusing this one-user service.
+
+For development, sign in, open `/jobs`, and choose **Evaluate top jobs**. Open a job to mark it viewed. Inspect diagnostics with `select * from recommendation_runs order by started_at desc limit 20`. Matching candidate, job, and prompt hashes prevent repeated OpenAI spending.
+
+Automatic here: protected scheduled ATS ingestion when invoked, discovery persistence, bounded selection, and requested/admin-run evaluation. Not automatic: applications, form filling, tailored resumes or cover letters, browser automation, arbitrary scraping, notifications, embeddings, or training. Future notification delivery can consume discovery state without coupling itself to ingestion or evaluation.
+
 A personal job-opportunity dashboard built with Next.js, TypeScript, Tailwind CSS, and Supabase.
 
 ## Phase 2
