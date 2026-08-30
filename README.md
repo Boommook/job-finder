@@ -1,5 +1,28 @@
 # Job Finder
 
+## Phase 6: continuous public job discovery
+
+Phase 6 expands the existing provider → normalization → persistence → recommendation architecture without coupling ingestion to AI. Supported public sources are Greenhouse, Lever, Ashby, SmartRecruiters, and Recruitee. SmartRecruiters was selected for its stable company postings JSON and broad enterprise coverage; Recruitee was selected for its documented public JSON job feed and direct careers/application URLs. Workday is deferred because external-site tenant/site/pagination variants require a more complex provider configuration; Workable, Jobvite, and BambooHR are deferred where reliable broad access would require credentials or brittle employer-specific HTML.
+
+Sources remain database configuration in `job_sources`. Add a company with a validated provider enum and its provider-specific identifier (Greenhouse board token, Lever/Ashby/Recruitee subdomain, or SmartRecruiters company identifier). Identifiers are restricted to 1–100 letters, numbers, underscores, and hyphens. Adapters construct fixed HTTPS provider hosts; arbitrary URLs are never fetch targets. Disable a row by setting `enabled=false`. Phase 6 seeds 40 total boards spanning major technology, software/devtools, robotics, graphics/gaming, and startup employers; board ownership can change, so verify a source before enabling it in production.
+
+Each provider posting has a durable `job_provenance` row keyed by `(source_id, external_id)`. Canonical jobs use a deterministic key: the same normalized employer ATS URL merges, or an exact normalized company + title + location + employment type + description fingerprint merges. A matching title alone never merges; materially different company, location, employment type, or description stays separate. Provenance, first seen, statuses, evaluations, and internal job IDs are retained. Apply links prefer an employer ATS application URL, then employer careers URL, then a third-party listing; no application is ever submitted.
+
+Complete successful board scans deactivate missing provenance and close a canonical job only when no active provenance remains. Failed scans never close anything. Incomplete/paginated scans do not close missing postings. Jobs not confirmed for 14 days can become `stale`; history is never deleted and saved/applied status remains intact. Rediscovery updates the same provenance and canonical identity. "New" remains per-user and durable until detail is opened; list browsing does not set `viewed_at`.
+
+Call `GET` or `POST /api/cron/ingest` with `Authorization: Bearer $CRON_SECRET`. Each invocation processes at most `INGESTION_MAX_SOURCES_PER_RUN` (default 8, hard cap 25), selecting least-recently-attempted enabled sources first so repeated calls rotate fairly. Sources run independently with a 20-second provider timeout and concise per-source diagnostics. Overlap is reduced by bounded rotation; deployments should schedule a single ingestion invocation at a time.
+
+Call `GET` or `POST /api/cron/recommendations` with the same authorization. It processes the comma-separated `RECOMMENDATION_USER_IDS` (falling back to `INGESTION_ADMIN_USER_IDS`), bounded by `RECOMMENDATION_MAX_USERS_PER_RUN`, and reuses `runRecommendationsForUser()`. The existing hard eligibility → deterministic prefilter → bounded AI evaluation → ranking flow and evaluation cache remain unchanged. Ingestion never invokes OpenAI, and Phase 5's `AUTO_EVALUATION_LIMIT`, hard safety cap, prefilter threshold, description cap, and candidate scan cap still apply.
+
+New server-only configuration:
+
+```dotenv
+INGESTION_MAX_SOURCES_PER_RUN=8
+RECOMMENDATION_USER_IDS=your-auth-user-uuid
+```
+
+Run `supabase/migrations/20260830020000_phase_6_source_expansion.sql` after all Phase 5 migrations. The service-role key, OpenAI key, cron secret, and recommendation user IDs must never use a `NEXT_PUBLIC_` prefix. Supabase RLS keeps private user data private; authenticated users can only read shared source/provenance diagnostics. Job Finder does **not** scrape authenticated LinkedIn, Indeed, or Handshake accounts, does not use browser automation or embeddings, and never applies to jobs automatically. The user always follows the original employer link and applies manually.
+
 ## Phase 5: personalized recommendation agent
 
 Run `supabase/migrations/20260830000000_phase_5_recommendations.sql` after Phase 4, followed by `supabase/migrations/20260830010000_phase_5_recommendations_cleanup.sql`. They add private `user_job_discovery` inbox state, recommendation-run diagnostics, and the globally filtered/ranked feed RPC. Discovery is separate from saved/rejected/applied status: `first_seen_at` is durable, list views only update `last_seen_at`/`surfaced_at`, and `viewed_at` is set only when a detail page is opened.

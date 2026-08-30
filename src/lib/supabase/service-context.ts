@@ -1,0 +1,2 @@
+import{AsyncLocalStorage}from"node:async_hooks";import type{SupabaseClient}from"@supabase/supabase-js";import type{Database}from"@/types/database";
+const storage=new AsyncLocalStorage<SupabaseClient<Database>>();export function currentServiceClient(){return storage.getStore()}export function runWithServiceClient<T>(client:SupabaseClient<Database>,work:()=>Promise<T>){return storage.run(client,work)}
