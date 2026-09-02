@@ -1,4 +1,6 @@
 -- Phase 6: public-source expansion, canonical provenance, lifecycle, and fair scheduling metadata.
+create extension if not exists pgcrypto with schema extensions;
+
 alter table public.job_sources alter column provider type text using provider::text;
 alter table public.job_sources add constraint job_sources_provider_phase6_check check(provider in('greenhouse','lever','ashby','smartrecruiters','recruitee'));
 
@@ -36,7 +38,7 @@ begin
     coalesce(lower(new.seniority),''),coalesce(new.sponsorship::text,'')),'sha256'),'hex');
   return new;
 end; $$;
-drop trigger jobs_evaluation_content_hash on public.jobs;
+drop trigger if exists jobs_evaluation_content_hash on public.jobs;
 create trigger jobs_evaluation_content_hash before insert or update of company,title,description,location,workplace_type,employment_type,salary_min,salary_max,salary_currency,compensation_interval,skills,seniority,sponsorship
 on public.jobs for each row execute function public.set_job_evaluation_content_hash();
 
