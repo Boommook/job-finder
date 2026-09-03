@@ -4,7 +4,6 @@ import { getAdapter } from "./adapters";
 import type { JobSourceProvider, SourceConfig } from "./types";
 
 type AdminClientFactory = () => SupabaseClient<Database>;
-type RpcResult = { data: Json | null; error: { message: string } | null };
 const IDENTIFIER = /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/;
 export const INGESTION_MAX_SOURCES_SAFETY_CAP = 25;
 
@@ -28,8 +27,7 @@ export function createIngestionRunner(createAdminClient:AdminClientFactory){
       const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20_000);let scan;
       try{scan=await getAdapter(source.provider).fetchJobs(source,controller.signal)}finally{clearTimeout(timer)}
       const payload=scan.jobs.map(job=>({external_id:job.externalId,source:job.provider,source_url:job.sourceUrl,application_url:job.applicationUrl??null,company:job.company,title:job.title,description:job.description,location:job.location,workplace_type:job.workplaceType??null,employment_type:job.employmentType??null,salary_min:job.salaryMin??null,salary_max:job.salaryMax??null,salary_currency:job.salaryCurrency??null,compensation_interval:job.compensationInterval,skills:job.skills,seniority:job.seniority??null,sponsorship:job.sponsorship??null,posted_at:job.postedAt??null,raw_payload:job.rawPayload,content_hash:job.contentHash,canonical_key:job.canonicalKey}));
-      const rpc=db.rpc as unknown as (fn:string,args:Record<string,unknown>)=>Promise<RpcResult>;
-      const {data,error}=await rpc("persist_ingestion_scan",{p_source_id:source.id,p_jobs:payload as Json,p_complete:scan.complete});
+      const {data,error}=await db.rpc("persist_ingestion_scan",{p_source_id:source.id,p_jobs:payload as Json,p_complete:scan.complete});
       if(error)throw new Error(error.message);
       const counts=(data??{})as Record<string,number>,now=new Date().toISOString();
       await Promise.all([db.from("job_sources").update({last_scanned_at:now,last_success_at:now,last_error:null}).eq("id",source.id),db.from("ingestion_runs").update({completed_at:now,status:"succeeded",fetched_count:scan.jobs.length,inserted_count:counts.inserted??0,updated_count:counts.updated??0,deactivated_count:counts.deactivated??0}).eq("id",run.id)]);
