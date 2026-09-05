@@ -5,7 +5,7 @@ import { runRecommendationSelection } from "./engine";
 import { classifyCareerLevel, evaluateLocation, parseMinimumYearsExperience } from "./realism";
 import type { CandidateData, Job, JobEvaluation, JobPreferences } from "@/types/job";
 
-const preferences:JobPreferences={desiredTitles:["Software Engineer"],desiredLocations:["Massachusetts"],allowUsRemote:true,remotePreference:"flexible",employmentTypes:[],minimumSalary:null,preferredIndustries:[],preferredSkills:[],excludedKeywords:[],sponsorshipRequired:false};
+const preferences:JobPreferences={internshipSeason:"any",internshipYear:null,desiredTitles:["Software Engineer"],desiredLocations:["Massachusetts"],allowUsRemote:true,remotePreference:"flexible",employmentTypes:[],minimumSalary:null,preferredIndustries:[],preferredSkills:[],excludedKeywords:[],sponsorshipRequired:false};
 const candidate={profile:{preferredRoleLevel:"entry level"}} as Pick<CandidateData,"profile">;
 const job=(values:Partial<Job>={}):Job=>({id:"job",company:"Acme",title:"Software Engineer",category:"Other",location:"Boston, MA",description:"Build software",discoveredAt:"2026-08-01T00:00:00Z",sourceUrl:"https://example.com",status:"new",isActive:true,...values});
 const evaluation:JobEvaluation={overallScore:80,skillScore:80,experienceScore:80,educationScore:80,interestScore:80,locationScore:80,compensationScore:null,verdict:"strong",recommendation:"apply",summary:"",matchingSkills:[],missingSkills:[],strengths:[],concerns:[]};

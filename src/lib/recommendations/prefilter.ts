@@ -1,10 +1,17 @@
 import{evaluateEligibility}from"@/lib/ingestion/eligibility";import{classifyCareerLevel,evaluateLocation,isEarlyCareerPreference}from"./realism";import type{CandidateData,Job,JobPreferences}from"@/types/job";
+import { detectInternshipTiming, isInternship } from "@/lib/internship-timing";
 export interface PrefilterResult{eligible:boolean;score:number;reasons:string[]}
 const words=(value:string)=>new Set(value.toLowerCase().replace(/[^a-z0-9+#.]+/g," ").split(/\s+/).filter(x=>x.length>1));
 const overlap=(a:Iterable<string>,b:Iterable<string>)=>{const right=new Set([...b].map(x=>x.toLowerCase()));return[...a].filter(x=>right.has(x.toLowerCase())).length};
 export function prefilterJob(job:Job,preferences:JobPreferences,candidate:Pick<CandidateData,"profile"|"skills">,now=new Date()):PrefilterResult{
   const hard=evaluateEligibility(job,preferences,candidate);if(!hard.eligible)return{eligible:false,score:0,reasons:hard.reasons.map(x=>`Excluded: ${x}`)};
   let score=35;const reasons:string[]=[];
+  if(isInternship(job)&&(preferences.internshipSeason&&preferences.internshipSeason!=="any"||preferences.internshipYear!=null)){
+    const timing=detectInternshipTiming(job);
+    if(preferences.internshipSeason!=="any"&&timing.seasons.includes(preferences.internshipSeason)){score+=8;reasons.push("Matches target internship season")}
+    if(preferences.internshipYear!=null&&timing.years.includes(preferences.internshipYear)){score+=5;reasons.push("Matches target internship year")}
+    if(!timing.seasons.length&&!timing.years.length)reasons.push("Internship timing is not specified");
+  }
   const titleWords=words(job.title),desired=preferences.desiredTitles.map(words),titleMatch=desired.reduce((best,item)=>Math.max(best,overlap(titleWords,item)),0);
   if(titleMatch){const points=Math.min(22,10+titleMatch*6);score+=points;reasons.push("Title matches a desired role")}else if(preferences.desiredTitles.length){score-=8;reasons.push("Title is outside desired roles")}
   const candidateSkills=candidate.skills.map(x=>x.skillName),wanted=[...candidateSkills,...preferences.preferredSkills],skillMatches=overlap(job.skills??[],wanted);if(skillMatches){score+=Math.min(24,skillMatches*6);reasons.push(`${skillMatches} declared skill match${skillMatches===1?"":"es"}`)}
