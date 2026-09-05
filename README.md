@@ -41,6 +41,7 @@ AI_PREFILTER_THRESHOLD=55
 AI_MAX_JOB_DESCRIPTION_LENGTH=12000
 RECOMMENDATION_MAX_USERS_PER_RUN=10
 RECOMMENDATION_CANDIDATE_SCAN_LIMIT=200
+RECOMMENDATION_ACTIVE_UNIVERSE_LIMIT=5000
 ```
 
 Schedule ingestion with `GET` or `POST /api/cron/ingest` and `Authorization: Bearer $CRON_SECRET`. It calls the existing scheduler-neutral ingestion runner. `POST /api/recommendations/run` is a bounded per-user admin entry point: invoke while signed in as an ID in `INGESTION_ADMIN_USER_IDS`; it processes only that user. Future all-user scheduling should page opted-in user IDs with a durable cursor and fixed runtime budget while reusing this one-user service.
